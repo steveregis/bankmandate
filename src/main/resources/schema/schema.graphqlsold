@@ -1,0 +1,40 @@
+type Mandate {
+    mandateId: ID
+    mandateType: String
+    effectiveDate: String
+    expiryDate: String
+    approvers: [String]
+    instructions: String
+    version: Int
+    lastModifiedBy: String
+    lastModifiedDate: String
+}
+
+type Query {
+    getMandates: [Mandate]
+    getMandateById(mandateId: ID!): Mandate
+}
+
+type Mutation {
+    createMandate(
+        mandateType: String!
+        effectiveDate: String!
+        expiryDate: String!
+        approvers: [String]!
+        instructions: String!
+    ): Mandate
+
+     updateMandate(
+        mandateId: ID!
+        input: UpdateMandateInput!
+    ): Mandate
+}
+
+input UpdateMandateInput {
+    mandateType: String
+    effectiveDate: String
+    expiryDate: String
+    approvers: [String]
+    instructions: String
+    attachments: [String]
+}

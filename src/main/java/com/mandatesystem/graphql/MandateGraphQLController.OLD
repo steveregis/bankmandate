@@ -1,0 +1,114 @@
+package com.mandatesystem.graphql;
+
+import com.mandatesystem.domain.Mandate;
+import com.mandatesystem.repository.MandateRepository;
+
+import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Controller;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Controller
+public class MandateGraphQLController {
+
+    @Autowired
+    private MandateRepository mandateRepository;
+
+    @QueryMapping
+    public List<Mandate> getMandates() {
+        return mandateRepository.findAll();
+    }
+
+    @QueryMapping
+public Mandate getMandate(@Argument UUID mandateId) {
+    return mandateRepository.findById(mandateId)
+            .orElseThrow(() -> new RuntimeException("Mandate not found"));
+}
+
+
+    @QueryMapping
+    public Mandate getMandateById(@Argument UUID mandateId) {
+        return mandateRepository.findById(mandateId)
+                .orElseThrow(() -> new RuntimeException("Mandate not found"));
+    }
+
+
+    @Transactional
+    @MutationMapping
+    public Mandate createMandate(
+        @Argument String mandateType,
+        @Argument String effectiveDate,
+        @Argument String expiryDate,
+        @Argument String instructions
+    ) {
+        // Check if a similar mandate already exists
+        Optional<Mandate> existingMandate = mandateRepository.findByMandateTypeAndEffectiveDate(
+                mandateType, LocalDate.parse(effectiveDate)
+        );
+
+        if (existingMandate.isPresent()) {
+            throw new IllegalArgumentException("A mandate with the same type and effective date already exists.");
+        }
+
+        // Create and save the new mandate
+        Mandate mandate = new Mandate();
+        mandate.setMandateId(UUID.randomUUID());
+        mandate.setMandateType(mandateType);
+        mandate.setEffectiveDate(LocalDate.parse(effectiveDate));
+        mandate.setExpiryDate(LocalDate.parse(expiryDate));
+        //mandate.setApprovers(approvers);
+        mandate.setInstructions(instructions);
+        mandate.setVersion(0); // Start with version 0
+        mandate.setLastModifiedBy("system"); // Example: Set by the system or logged-in user
+        mandate.setLastModifiedDate(LocalDateTime.now());
+
+
+        return mandateRepository.save(mandate);
+    }
+
+    @Transactional
+    @MutationMapping
+
+public Mandate updateMandate(@Argument String mandateId, @Argument UpdateMandateInput input) {
+    try {
+        // Fetch existing Mandate
+        Mandate existingMandate = mandateRepository.findById(UUID.fromString(mandateId))
+            .orElseThrow(() -> new RuntimeException("Mandate not found"));
+
+        // Update fields only if they are not null
+        if (input.getMandateType() != null && !input.getMandateType().isEmpty()) {
+            existingMandate.setMandateType(input.getMandateType());
+        }
+        if (input.getEffectiveDate() != null) {
+            existingMandate.setEffectiveDate(input.getEffectiveDate());
+        }
+       /* if (input.getApprovers() != null && !input.getApprovers().isEmpty()) {
+            existingMandate.setApprovers(input.getApprovers());
+        } */
+        if (input.getInstructions() != null && !input.getInstructions().isEmpty()) {
+            existingMandate.setInstructions(input.getInstructions());
+        }
+        if (input.getAttachments() != null && !input.getAttachments().isEmpty()) {
+            existingMandate.setAttachments(input.getAttachments());
+        }
+
+        // Save and return updated Mandate
+        return mandateRepository.save(existingMandate);
+    } catch (ObjectOptimisticLockingFailureException e) {
+        throw new RuntimeException("Another user has updated this mandate. Please reload and try again.");
+    } catch (Exception e) {
+        throw new RuntimeException("An error occurred while updating the mandate: " + e.getMessage());
+    }
+}
+
+}
